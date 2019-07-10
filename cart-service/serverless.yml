@@ -11,26 +11,53 @@
 #
 # Happy Coding!
 
-service: cart # NOTE: update this with your service name
+service: cart-service # NOTE: update this with your service name
 #app: your-app-name
 #tenant: your-tenant-name
 
 # You can pin your service to only deploy with a specific Serverless version
 # Check out our docs for more details
-# frameworkVersion: "=X.X.X"
+frameworkVersion: ">=1.1.0 <2.0.0"
 
 provider:
   name: aws
   runtime: nodejs10.x
-
-# you can overwrite defaults here
-#  stage: dev
-#  region: us-east-1
+  stage: dev
+  region: us-east-1
+  environment:
+    ITEM_TABLE: ${self:service}-${opt:stage, self:provider.stage}
+    CUSTOMER_EMAIL_TABLE: "customer-email-${opt:stage, self:provider.stage}"
 
 # you can add statements to the Lambda function's IAM Role here
-#  iamRoleStatements:
-#    - Effect: "Allow"
-#      Action:
+  iamRoleStatements:
+    - Effect: "Allow"
+      Action:
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+      Resource: "*"
+
+
+resources:
+  Resources:
+    CustomerDynamoDbTable:
+      Type: 'AWS::DynamoDB::Table'
+      DeletionPolicy: Retain
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: "id"
+            AttributeType: "S" 
+        KeySchema:
+          - AttributeName: "id"
+            KeyType: "HASH"
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        StreamSpecification:
+          StreamViewType: "NEW_AND_OLD_IMAGES"
+        TableName: ${self:provider.environment.ITEM_TABLE}
+
 #        - "s3:ListBucket"
 #      Resource: { "Fn::Join" : ["", ["arn:aws:s3:::", { "Ref" : "ServerlessDeploymentBucket" } ] ]  }
 #    - Effect: "Allow"
@@ -42,6 +69,8 @@ provider:
 #          - - "arn:aws:s3:::"
 #            - "Ref" : "ServerlessDeploymentBucket"
 #            - "/*"
+
+
 
 # you can define service wide environment variables here
 #  environment:
@@ -57,8 +86,23 @@ provider:
 #    - exclude-me-dir/**
 
 functions:
-  hello:
-    handler: handler.hello
+  itemSubmission:
+    handler: api/item.submit
+    memorySize: 128
+    description: Submit item information and starts interview process.
+    events:
+      - http: 
+          path: item
+          method: post
+  getItem:
+    handler: api/item.get
+    memorySize: 128
+    description: get item information
+    events:
+      - http:
+          path: item
+          method: get
+
 
 #    The following are a few example events you can configure
 #    NOTE: Please make sure to change your handler code to work with those events
